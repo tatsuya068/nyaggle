@@ -33,6 +33,25 @@ ExperimentResult = namedtuple('ExperimentResult',
                               ])
 
 
+class ExpeimentProxy(object):
+    __slots__ = ["_obj", "__weakref__"]
+
+    def __init__(self, obj):
+        object.__setattr__(self, "_obj", obj)
+
+    def __getattribute__(self, name):
+        return getattr(object.__getattribute__(self, "_obj"), name)
+
+    def __setattr__(self, name, value):
+        setattr(object.__getattribute__(self, "_obj"), name, value)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, ex_type, ex_value, trace):
+        pass
+
+
 def run_experiment(model_params: Dict[str, Any],
                    X_train: pd.DataFrame, y: pd.Series,
                    X_test: Optional[pd.DataFrame] = None,
@@ -49,6 +68,7 @@ def run_experiment(model_params: Dict[str, Any],
                    type_of_target: str = 'auto',
                    feature_list: Optional[List[Union[int, str]]] = None,
                    feature_directory: Optional[str] = None,
+                   custom_experiment: Optional[Experiment] = None,
                    with_auto_hpo: bool = False,
                    with_auto_prep: bool = False,
                    with_mlflow: bool = False
@@ -186,7 +206,12 @@ def run_experiment(model_params: Dict[str, Any],
 
     logging_directory = logging_directory.format(time=datetime.now().strftime('%Y%m%d_%H%M%S'))
 
-    with Experiment(logging_directory, if_exists=if_exists, with_mlflow=with_mlflow) as exp:
+    if custom_experiment is not None:
+        experiment = ExpeimentProxy(custom_experiment)
+    else:
+        experiment = Experiment(logging_directory, if_exists=if_exists, with_mlflow=with_mlflow)
+
+    with experiment as exp:
         exp.log('Algorithm: {}'.format(algorithm_type))
         exp.log('Experiment: {}'.format(logging_directory))
         exp.log('Params: {}'.format(model_params))
